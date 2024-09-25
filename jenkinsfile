@@ -1,19 +1,29 @@
 pipeline {
     agent any
+    tools {
+        // This tells Jenkins to use the Docker tool you've configured as "Docker"
+        dockerTool 'Docker'
+    }
     environment {
         // The following variable is required for a Semgrep Cloud Platform–connected scan:
         SEMGREP_APP_TOKEN = credentials('SEMGREP_APP_TOKEN')
     }
     stages {
         stage('Semgrep-Scan') {
+            agent {
+                // Use the Docker image to run the Semgrep scan inside a container
+                docker {
+                    image 'returntocorp/semgrep'
+                    // No need to mount the Docker socket since the plugin takes care of Docker interaction
+                    args '-v "$(pwd)":/src --workdir /src'
+                }
+            }
             steps {
+                // Run the Semgrep scan using the provided configuration
                 sh '''
-                docker pull returntocorp/semgrep && \
-                docker run \
-                -e SEMGREP_APP_TOKEN=$SEMGREP_APP_TOKEN \
-                -v "$(pwd)":/src \
-                --workdir /src \
-                returntocorp/semgrep semgrep ci
+                semgrep ci --config p/ci \
+                           --config p/security-audit \
+                           --config p/secrets
                 '''
             }
         }
